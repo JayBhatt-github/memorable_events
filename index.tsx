@@ -40,10 +40,16 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 const root = ReactDOM.createRoot(rootElement);
 console.log("Mounting React App...");
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+
+try {
+  root.render(
+    <React.StrictMode>
+      <div style={{ color: 'red', fontSize: '40px', padding: '20px' }}>
+        TEST: REACT IS WORKING
+      </div>
+    </React.StrictMode>
+  );
+} catch (e) {
+  console.error("Render failed", e);
+  rootElement.innerHTML = "Render Failed: " + e;
+}
