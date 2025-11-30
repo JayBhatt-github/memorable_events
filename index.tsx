@@ -8,6 +8,7 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+console.log("Mounting React App...");
 root.render(
   <React.StrictMode>
     <App />
