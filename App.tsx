@@ -12,24 +12,28 @@ import MenuSection from './components/MenuSection';
 import ModeSelectionScreen from './components/ModeSelectionScreen';
 import AdminLoginModal from './components/AdminLoginModal';
 import AdminPanel from './components/AdminPanel';
+import BookingModal from './components/BookingModal';
 import DecorationModal from './components/DecorationModal';
+
 import RealReelsSection from './components/RealReelsSection';
-import { ModalType, ServiceMode, Service, Plan, Cake, GalleryItem, RealReel } from './types';
+import { ModalType, ServiceMode, Service, Plan, Cake, GalleryItem, RealReel, SetupImage, AddOn } from './types';
 import {
   DEFAULT_INDOOR_DECORATIONS, DEFAULT_OUTDOOR_DECORATIONS,
   DEFAULT_INDOOR_PLANS, DEFAULT_OUTDOOR_PLANS,
   DEFAULT_CAKES, DEFAULT_GALLERY_ITEMS,
   INDOOR_SETUP_IMAGES, OUTDOOR_SETUP_IMAGES,
-  REAL_REELS_DATA
+  REAL_REELS_DATA, DEFAULT_ADDONS
 } from './data';
+// ...
 import { ArrowRight } from 'lucide-react';
 import { api } from './services/apiService';
 
 function App() {
   const [activeModal, setActiveModal] = useState<ModalType>(ModalType.NONE);
   const [mode, setMode] = useState<ServiceMode | null>(null);
-  const [isAdmin, setIsAdmin] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [selectedDecoration, setSelectedDecoration] = useState<Service | null>(null);
+  const [bookingSelection, setBookingSelection] = useState<{ decoration: Service, setup: SetupImage | null, plan: Plan, mode: 'INDOOR' | 'OUTDOOR' } | null>(null);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
 
   // Content State
@@ -40,8 +44,29 @@ function App() {
   const [cakes, setCakes] = useState<Cake[]>(DEFAULT_CAKES);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(DEFAULT_GALLERY_ITEMS);
   const [reels, setReels] = useState<RealReel[]>([]);
+  const [addons, setAddons] = useState<AddOn[]>(DEFAULT_ADDONS);
 
   const [settings, setSettings] = useState<{ heroVideoUrl?: string }>({});
+
+  const handlePlanSelect = (plan: Plan, setup: SetupImage | null) => {
+    if (selectedDecoration && mode) {
+      setBookingSelection({
+        decoration: selectedDecoration,
+        setup,
+        plan,
+        mode
+      });
+      setActiveModal(ModalType.BOOKING);
+    }
+  };
+
+  // Check for admin session on mount
+  useEffect(() => {
+    const token = sessionStorage.getItem('admin_token');
+    if (token) {
+      setIsAdmin(true);
+    }
+  }, []);
 
   // Fetch content on mount
   useEffect(() => {
@@ -56,6 +81,7 @@ function App() {
         if (content.cakes && content.cakes.length > 0) setCakes(content.cakes);
         if (content.galleryItems && content.galleryItems.length > 0) setGalleryItems(content.galleryItems);
         if (content.settings) setSettings(content.settings);
+        if (content.addons && content.addons.length > 0) setAddons(content.addons);
 
         if (content.reels && content.reels.length > 0) {
           setReels(content.reels);
@@ -130,6 +156,7 @@ function App() {
         case 'cakes': setCakes([...cakes, newItem]); break;
         case 'gallery': setGalleryItems([...galleryItems, newItem]); break;
         case 'reels': setReels([...reels, newItem]); break;
+        case 'addons': setAddons([...addons, newItem]); break;
       }
     } catch (e) {
       console.error("Create failed", e);
@@ -150,6 +177,7 @@ function App() {
         case 'cakes': setCakes(updateList(cakes)); break;
         case 'gallery': setGalleryItems(updateList(galleryItems)); break;
         case 'reels': setReels(updateList(reels)); break;
+        case 'addons': setAddons(updateList(addons)); break;
       }
     } catch (e) {
       console.error("Update failed", e);
@@ -170,6 +198,7 @@ function App() {
         case 'cakes': setCakes(filterList(cakes)); break;
         case 'gallery': setGalleryItems(filterList(galleryItems)); break;
         case 'reels': setReels(filterList(reels)); break;
+        case 'addons': setAddons(filterList(addons)); break;
       }
     } catch (e) {
       console.error("Delete failed", e);
@@ -285,13 +314,23 @@ function App() {
         onClose={closeModal}
         decoration={selectedDecoration}
         setupImages={setupImagesForModal}
+        plans={mode === 'INDOOR' ? indoorPlans : outdoorPlans}
+        onPlanSelect={handlePlanSelect}
       />
+      {bookingSelection && (
+        <BookingModal
+          isOpen={activeModal === ModalType.BOOKING}
+          onClose={closeModal}
+          selection={bookingSelection}
+          addons={addons}
+        />
+      )}
       <AdminLoginModal isOpen={activeModal === ModalType.ADMIN_LOGIN} onClose={closeModal} onLogin={handleAdminLogin} />
       {isAdmin && (
         <AdminPanel
           isOpen={activeModal === ModalType.ADMIN_PANEL}
           onClose={closeModal}
-          content={{ indoorDecorations, outdoorDecorations, indoorPlans, outdoorPlans, cakes, galleryItems, reels, settings }}
+          content={{ indoorDecorations, outdoorDecorations, indoorPlans, outdoorPlans, cakes, galleryItems, reels, settings, addons }}
           actions={{ onCreate: handleCreateItem, onUpdate: handleUpdateItem, onDelete: handleDeleteItem, onUpdateSettings: handleUpdateSettings }}
         />
       )}

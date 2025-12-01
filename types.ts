@@ -13,6 +13,7 @@ export enum ModalType {
     PORTFOLIO = 'PORTFOLIO',
     ADMIN_LOGIN = 'ADMIN_LOGIN',
     ADMIN_PANEL = 'ADMIN_PANEL',
+    BOOKING = 'BOOKING',
     DECORATION = 'DECORATION',
 }
 
@@ -77,6 +78,13 @@ export interface RealReel {
     category: 'INDOOR' | 'OUTDOOR';
 }
 
+export interface AddOn {
+    id: number;
+    name: string;
+    price: string;
+    type: 'checkbox' | 'quantity';
+}
+
 // API Response Types
 export interface ContentResponse {
     indoorDecorations: Service[];
@@ -86,6 +94,7 @@ export interface ContentResponse {
     cakes: Cake[];
     galleryItems: GalleryItem[];
     reels: RealReel[];
+    addons?: AddOn[];
     settings?: {
         heroVideoUrl?: string;
     };

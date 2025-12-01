@@ -9,6 +9,8 @@ const InquirySection: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    contactNumber: '',
+    indoorOutdoor: '',
     type: '',
     message: ''
   });
@@ -103,6 +105,25 @@ const InquirySection: React.FC = () => {
                   />
                 </div>
                 <div className="group space-y-2">
+                  <label className={`text-[10px] font-bold uppercase tracking-wider transition-colors duration-300 ${focusedField === 'contactNumber' ? 'text-brand-primary' : 'text-zinc-500'}`}>
+                    Contact Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="contactNumber"
+                    value={formData.contactNumber}
+                    onChange={handleChange}
+                    placeholder="+91 98765 43210"
+                    onFocus={() => setFocusedField('contactNumber')}
+                    onBlur={() => setFocusedField(null)}
+                    className="w-full bg-transparent border-b border-white/10 py-4 text-base md:text-sm text-white placeholder-zinc-800 focus:outline-none focus:border-brand-primary transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="group space-y-2">
                   <label className={`text-[10px] font-bold uppercase tracking-wider transition-colors duration-300 ${focusedField === 'email' ? 'text-brand-primary' : 'text-zinc-500'}`}>
                     Email Address
                   </label>
@@ -117,6 +138,24 @@ const InquirySection: React.FC = () => {
                     className="w-full bg-transparent border-b border-white/10 py-4 text-base md:text-sm text-white placeholder-zinc-800 focus:outline-none focus:border-brand-primary transition-all"
                     required
                   />
+                </div>
+                <div className="group space-y-2">
+                  <label className={`text-[10px] font-bold uppercase tracking-wider transition-colors duration-300 ${focusedField === 'indoorOutdoor' ? 'text-brand-primary' : 'text-zinc-500'}`}>
+                    Service Type
+                  </label>
+                  <select
+                    name="indoorOutdoor"
+                    value={formData.indoorOutdoor}
+                    onChange={handleChange}
+                    onFocus={() => setFocusedField('indoorOutdoor')}
+                    onBlur={() => setFocusedField(null)}
+                    className="w-full bg-transparent border-b border-white/10 py-4 text-base md:text-sm text-white focus:outline-none focus:border-brand-primary transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option className="bg-zinc-900" value="">Select Service</option>
+                    <option className="bg-zinc-900" value="INDOOR">Indoor (Room Decoration)</option>
+                    <option className="bg-zinc-900" value="OUTDOOR">Outdoor (Event Logistics)</option>
+                  </select>
                 </div>
               </div>
 
@@ -133,7 +172,7 @@ const InquirySection: React.FC = () => {
                   className="w-full bg-transparent border-b border-white/10 py-4 text-base md:text-sm text-white focus:outline-none focus:border-brand-primary transition-all appearance-none cursor-pointer"
                   required
                 >
-                  <option className="bg-zinc-900" value="">Select an option</option>
+                  <option className="bg-zinc-900" value="">Select Event Type</option>
                   <option className="bg-zinc-900" value="corporate">Corporate Event</option>
                   <option className="bg-zinc-900" value="wedding">Wedding</option>
                   <option className="bg-zinc-900" value="social">Social Gathering</option>

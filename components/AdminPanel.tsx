@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Edit, Save } from 'lucide-react';
-import { Service, Plan, Cake, GalleryItem, RealReel, SetupImage } from '../types';
+import { Service, Plan, Cake, GalleryItem, RealReel, SetupImage, AddOn } from '../types';
 import { api } from '../services/apiService';
 
 interface AdminPanelProps {
@@ -15,6 +14,7 @@ interface AdminPanelProps {
         cakes: Cake[];
         galleryItems: GalleryItem[];
         reels: RealReel[];
+        addons?: AddOn[];
         settings?: { heroVideoUrl?: string };
     };
     actions: {
@@ -25,7 +25,7 @@ interface AdminPanelProps {
     };
 }
 
-type Tab = 'decorations' | 'plans' | 'cakes' | 'gallery' | 'reels' | 'general';
+type Tab = 'decorations' | 'plans' | 'cakes' | 'gallery' | 'reels' | 'addons' | 'general';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actions }) => {
     const [activeTab, setActiveTab] = useState<Tab>('decorations');
@@ -44,6 +44,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
         if (resource === 'cakes') return ['name', 'price', 'flavor', 'image'];
         if (resource === 'gallery') return ['title', 'category', 'image', 'className'];
         if (resource === 'reels') return ['caption', 'embedUrl', 'category'];
+        if (resource === 'addons') return ['name', 'price', 'type'];
         return [];
     };
 
@@ -58,10 +59,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
         setIsCreating(resource);
     };
 
+    const handleSave = async (data: any) => {
+        if (!editingItem) return;
+        if (isCreating) {
+            await actions.onCreate(editingItem.resource, data);
+        } else {
+            await actions.onUpdate(editingItem.resource, data.id, data);
+        }
+        setEditingItem(null);
+        setIsCreating(null);
+    };
+
     const EditForm = ({ resource, item, onSave, onCancel }: { resource: string, item: any, onSave: (item: any) => void, onCancel: () => void }) => {
         const [formData, setFormData] = useState(item);
         const [uploading, setUploading] = useState(false);
         const [newSetup, setNewSetup] = useState<Partial<SetupImage>>({});
+        const [editingSetupIndex, setEditingSetupIndex] = useState<number | null>(null);
         const fields = getFieldsForResource(resource);
 
         const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -78,8 +91,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                 setUploading(true);
                 try {
                     const url = await api.uploadFile(e.target.files[0]);
-                    // If editing a reel, we might be uploading a thumbnail
-                    // Actually, let's just assume the file input is next to the image/thumbnail field
                     const targetField = resource === 'reels' ? 'thumbnail' : 'image';
                     setFormData({ ...formData, [targetField]: url });
                 } catch (error: any) {
@@ -97,14 +108,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
         const handleReelLinkPaste = async (e: React.ChangeEvent<HTMLInputElement>) => {
             const url = e.target.value;
             setFormData({ ...formData, embedUrl: url });
-
-            // Try to extract Reel ID and auto-fill thumbnail
             try {
-                // Matches /reel/ID/ or /p/ID/
                 const match = url.match(/\/(?:reel|p)\/([a-zA-Z0-9_-]+)/);
                 if (match && match[1]) {
                     const reelId = match[1];
-                    // Auto-generate thumbnail URL (Note: This is a best-effort public URL, might require upload if it fails)
                     if (!formData.thumbnail) {
                         setFormData(prev => ({
                             ...prev,
@@ -112,17 +119,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                             thumbnail: `https://www.instagram.com/p/${reelId}/media/?size=l`
                         }));
                     }
-
-                    // Trigger backend fetch to get video file
                     setUploading(true);
                     try {
                         const result = await api.fetchReel(url);
                         if (result.url) {
                             setFormData(prev => ({
                                 ...prev,
-                                embedUrl: result.url, // Use local URL for playback
-                                thumbnail: result.thumbnail || prev.thumbnail, // Use generated thumbnail
-                                originalUrl: url // Keep original for reference
+                                embedUrl: result.url,
+                                thumbnail: result.thumbnail || prev.thumbnail,
+                                originalUrl: url
                             }));
                         }
                     } catch (err) {
@@ -196,6 +201,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                                         <option value="INDOOR">INDOOR</option>
                                         <option value="OUTDOOR">OUTDOOR</option>
                                     </select>
+                                ) : key === 'type' && resource === 'addons' ? (
+                                    <select
+                                        name={key}
+                                        value={formData[key] || ''}
+                                        onChange={handleChange}
+                                        className="w-full bg-zinc-800 border border-zinc-700 p-2 rounded text-sm text-white focus:outline-none focus:border-yellow-500"
+                                    >
+                                        <option value="checkbox">Checkbox (One-time)</option>
+                                        <option value="quantity">Quantity (Countable)</option>
+                                    </select>
                                 ) : key === 'embedUrl' && resource === 'reels' ? (
                                     <input
                                         type="text"
@@ -216,38 +231,53 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                                 )}
                             </div>
                         ))}
-                        {/* Setups Management Section */}
+
                         {(resource === 'indoor-decorations' || resource === 'outdoor-decorations') && (
                             <div className="mt-4 p-4 bg-zinc-800/30 rounded-lg border border-zinc-700">
                                 <h4 className="text-sm font-bold text-zinc-300 mb-3 uppercase tracking-wider">Setup Variations</h4>
-
-                                {/* List Existing Setups */}
                                 <div className="space-y-2 mb-4">
                                     {formData.setups?.map((setup: SetupImage, index: number) => (
-                                        <div key={index} className="flex items-center gap-3 p-2 bg-zinc-900 rounded border border-zinc-800">
-                                            <img src={setup.src} alt="" className="w-10 h-10 rounded object-cover" />
+                                        <div key={index} className={`flex items-center gap-3 p-2 rounded border ${editingSetupIndex === index ? 'bg-zinc-800 border-yellow-500/50' : 'bg-zinc-900 border-zinc-800'}`}>
+                                            {setup.src.match(/\.(mp4|webm)$/i) ? (
+                                                <video src={setup.src} className="w-10 h-10 rounded object-cover" muted />
+                                            ) : (
+                                                <img src={setup.src} alt="" className="w-10 h-10 rounded object-cover" />
+                                            )}
                                             <div className="flex-grow">
                                                 <div className="text-xs font-bold text-zinc-200">{setup.title}</div>
                                                 <div className="text-[10px] text-zinc-500">{setup.price}</div>
                                             </div>
-                                            <button
-                                                onClick={() => {
-                                                    const newSetups = [...(formData.setups || [])];
-                                                    newSetups.splice(index, 1);
-                                                    setFormData({ ...formData, setups: newSetups });
-                                                }}
-                                                className="p-1 text-red-400 hover:bg-red-400/10 rounded"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setNewSetup(setup);
+                                                        setEditingSetupIndex(index);
+                                                    }}
+                                                    className="p-1 text-blue-400 hover:bg-blue-400/10 rounded"
+                                                >
+                                                    <Edit size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const newSetups = [...(formData.setups || [])];
+                                                        newSetups.splice(index, 1);
+                                                        setFormData({ ...formData, setups: newSetups });
+                                                        if (editingSetupIndex === index) {
+                                                            setEditingSetupIndex(null);
+                                                            setNewSetup({});
+                                                        }
+                                                    }}
+                                                    className="p-1 text-red-400 hover:bg-red-400/10 rounded"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                     {(!formData.setups || formData.setups.length === 0) && (
                                         <div className="text-xs text-zinc-500 italic">No setups added yet.</div>
                                     )}
                                 </div>
-
-                                {/* Add New Setup */}
                                 <div className="grid grid-cols-2 gap-2">
                                     <input
                                         placeholder="Title"
@@ -273,7 +303,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                                             <input
                                                 type="file"
                                                 className="hidden"
-                                                accept="image/*"
+                                                accept={resource === 'indoor-decorations' || resource === 'outdoor-decorations' ? "image/*,video/*" : "image/*"}
                                                 onChange={async (e) => {
                                                     if (e.target.files?.[0]) {
                                                         try {
@@ -285,20 +315,39 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                                             />
                                         </label>
                                     </div>
-                                    <button
-                                        className="col-span-2 bg-green-600/20 text-green-400 hover:bg-green-600/30 p-2 rounded text-xs font-bold uppercase tracking-wider"
-                                        onClick={() => {
-                                            if (newSetup.title && newSetup.src) {
-                                                const setupToAdd = { ...newSetup, id: Date.now() } as SetupImage;
-                                                setFormData({ ...formData, setups: [...(formData.setups || []), setupToAdd] });
-                                                setNewSetup({});
-                                            } else {
-                                                alert("Title and Image are required");
-                                            }
-                                        }}
-                                    >
-                                        Add Setup
-                                    </button>
+                                    <div className="col-span-2 flex gap-2">
+                                        {editingSetupIndex !== null && (
+                                            <button
+                                                className="flex-1 bg-zinc-700 text-white hover:bg-zinc-600 p-2 rounded text-xs font-bold uppercase tracking-wider"
+                                                onClick={() => {
+                                                    setEditingSetupIndex(null);
+                                                    setNewSetup({});
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                        <button
+                                            className={`flex-1 p-2 rounded text-xs font-bold uppercase tracking-wider ${editingSetupIndex !== null ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'}`}
+                                            onClick={() => {
+                                                if (newSetup.title && newSetup.src) {
+                                                    const updatedSetups = [...(formData.setups || [])];
+                                                    if (editingSetupIndex !== null) {
+                                                        updatedSetups[editingSetupIndex] = { ...newSetup, id: updatedSetups[editingSetupIndex].id } as SetupImage;
+                                                        setEditingSetupIndex(null);
+                                                    } else {
+                                                        updatedSetups.push({ ...newSetup, id: Date.now() } as SetupImage);
+                                                    }
+                                                    setFormData({ ...formData, setups: updatedSetups });
+                                                    setNewSetup({});
+                                                } else {
+                                                    alert("Title and Image are required");
+                                                }
+                                            }}
+                                        >
+                                            {editingSetupIndex !== null ? 'Update Setup' : 'Add Setup'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -309,18 +358,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                     </div>
                 </div>
             </div>
-        )
-    };
-
-    const handleSave = async (data: any) => {
-        if (!editingItem) return;
-        if (isCreating) {
-            await actions.onCreate(editingItem.resource, data);
-        } else {
-            await actions.onUpdate(editingItem.resource, data.id, data);
-        }
-        setEditingItem(null);
-        setIsCreating(null);
+        );
     };
 
     return (
@@ -334,7 +372,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                         <p className="text-zinc-400 text-sm uppercase tracking-widest">Website Content Management</p>
                     </div>
                     <div className="flex items-center p-1 bg-black/20 rounded-full border border-white/5 overflow-x-auto">
-                        {(['decorations', 'plans', 'cakes', 'gallery', 'reels', 'general'] as Tab[]).map(tab => (
+                        {(['decorations', 'plans', 'cakes', 'gallery', 'reels', 'addons', 'general'] as Tab[]).map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeTab === tab ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}>{tab}</button>
                         ))}
                     </div>
@@ -491,6 +529,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, content, actio
                                         <div className="flex gap-2">
                                             <button onClick={() => handleEdit('reels', item)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded"><Edit size={14} /></button>
                                             <button onClick={() => actions.onDelete('reels', item.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 size={14} /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Addons Tab */}
+                    {activeTab === 'addons' && (
+                        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="font-bold text-zinc-300 uppercase tracking-wider">Add-ons</h4>
+                                <button onClick={() => handleCreateStart('addons')} className="p-2 bg-green-600/20 text-green-400 rounded-full hover:bg-green-600/40"><Plus size={16} /></button>
+                            </div>
+                            <div className="space-y-2">
+                                {content.addons?.map(item => (
+                                    <div key={item.id} className="flex items-center justify-between p-3 bg-zinc-900 rounded-xl border border-zinc-800 hover:border-zinc-700">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-8 h-8 rounded flex items-center justify-center bg-zinc-800 text-zinc-400`}>
+                                                {item.type === 'checkbox' ? <span className="text-xs">☑</span> : <span className="text-xs">123</span>}
+                                            </div>
+                                            <div>
+                                                <span className="font-medium text-zinc-200 block">{item.name}</span>
+                                                <span className="text-[10px] text-zinc-500">{item.price}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => handleEdit('addons', item)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded"><Edit size={14} /></button>
+                                            <button onClick={() => actions.onDelete('addons', item.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 size={14} /></button>
                                         </div>
                                     </div>
                                 ))}
