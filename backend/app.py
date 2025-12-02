@@ -610,7 +610,7 @@ def create_app():
 				return jsonify({"url": cloudinary_url})
 			except Exception as e:
 				print(f"Cloudinary Upload Error: {e}")
-				return jsonify({"error": "Failed to upload video"}), 500
+				return jsonify({"error": f"Failed to upload video: {str(e)}"}), 500
 
 		# Image upload (ImgBB)
 		api_key = os.environ.get("IMGBB_API_KEY")
@@ -626,7 +626,7 @@ def create_app():
 			
 			if resp.status_code != 200:
 				print(f"ImgBB Error: {resp.text}")
-				return jsonify({"error": "Failed to upload to external provider"}), 502
+				return jsonify({"error": f"Failed to upload to external provider: {resp.text}"}), 502
 			
 			result = resp.json()
 			if not result.get("success"):
@@ -636,7 +636,7 @@ def create_app():
 			return jsonify({"url": result["data"]["url"]})
 		except Exception as e:
 			print(f"Upload exception: {e}")
-			return jsonify({"error": "Internal upload error"}), 500
+			return jsonify({"error": f"Internal upload error: {str(e)}"}), 500
 
 	@app.route("/api/settings", methods=["POST"])
 	@token_required
