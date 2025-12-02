@@ -114,11 +114,19 @@ def create_app():
 	CORS(app, resources={r"/api/*": {"origins": "*"}}, allow_headers=["Content-Type", "Authorization"])
 
 	# Initialize Cloudinary
-	cloudinary.config(
-		cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
-		api_key=os.environ.get("CLOUDINARY_API_KEY"),
-		api_secret=os.environ.get("CLOUDINARY_API_SECRET")
-	)
+	cloudinary_config = {
+		"cloud_name": os.environ.get("CLOUDINARY_CLOUD_NAME"),
+		"api_key": os.environ.get("CLOUDINARY_API_KEY"),
+		"api_secret": os.environ.get("CLOUDINARY_API_SECRET")
+	}
+
+	# PythonAnywhere Proxy Fix
+	proxy = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY")
+	if proxy:
+		print(f"DEBUG: Using Proxy for Cloudinary: {proxy}")
+		cloudinary_config["api_proxy"] = proxy
+
+	cloudinary.config(**cloudinary_config)
 
 	# Initialize DB and default admin now (avoid using before_first_request)
 	with app.app_context():
